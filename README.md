@@ -1,16 +1,78 @@
-# React + Vite
+# Job Assistant & Discovery Platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A premium, full-stack job search and discovery platform that aggregates listings from major job boards (**JSearch**, **Adzuna**, **Remotive**, and **The Muse**) to provide a personalized, match-centric experience.
 
-Currently, two official plugins are available:
+![Hero Image](file:///home/sukesh/Documents/Project/src/assets/hero.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 Features
 
-## React Compiler
+- **Personalized Job Aggregator**: Concurrently fetches jobs from 4 different platforms and normalizes the data into a unified, clean feed.
+- **Smart Discovery**: Matches job listings to your specific skills and preferred roles gathered during onboarding.
+- **Secure Authentication**: 
+  - Token-based authentication using **JWT**.
+  - Password security with **bcryptjs** hashing.
+  - **Google OAuth 2.0** integration for quick access.
+- **Intelligent Onboarding**: A one-time, database-backed onboarding flow that ensures your preferences are saved across devices.
+- **Premium Glassmorphic UI**: A modern, responsive design built with React and advanced CSS, featuring skeleton loaders and micro-animations.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🛠️ Tech Stack
 
-## Expanding the ESLint configuration
+- **Frontend**: React (Vite), React Router, @react-oauth/google
+- **Backend**: Node.js, Express, Axios
+- **Database**: MongoDB Atlas (Mongoose)
+- **Security**: JWT, bcryptjs
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 📦 Getting Started
+
+### Prerequisites
+
+- Node.js installed
+- MongoDB Atlas account (for the database URI)
+- RapidAPI Key (for JSearch)
+- Adzuna App ID/Key
+- The Muse API Key
+
+### Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/Sukesh-2006-cse/Job_Assistent.git
+   cd Job_Assistent
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   # Root (Frontend)
+   npm install
+   
+   # Server (Backend)
+   cd server
+   npm install
+   cd ..
+   ```
+
+3. **Environment Setup**:
+   Create a `.env` file in the `server/` directory and add your credentials:
+   ```env
+   MONGODB_URI=your_mongodb_uri
+   PORT=5000
+   JWT_SECRET=your_secret
+   JSEARCH_KEY=your_key
+   ADZUNA_ID=your_id
+   ADZUNA_KEY=your_key
+   MUSE_KEY=your_key
+   ```
+
+4. **Add Google Client ID**:
+   Update the `clientId` in `src/main.jsx` with your Google Cloud Console Client ID.
+
+### Running the App
+
+Run both frontend and backend simultaneously:
+```bash
+npm run start:all
+```
+
+## 📄 License
+
+This project is licensed under the MIT License.
