@@ -145,6 +145,24 @@
     color: black;
 }
 
+.briefBtn {
+    background: var(--accent-yellow);
+    color: black;
+    border: var(--border-width) solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    font-weight: 900;
+    font-size: 0.9rem;
+    cursor: pointer;
+    box-shadow: 2px 2px 0px 0px #000000;
+    transition: all 0.2s;
+}
+
+.briefBtn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 3px 3px 0px 0px #000000;
+}
+
 .markDoneBtn:hover:not(:disabled),
 .viewDetailsBtn:hover {
     transform: translate(-1px, -1px);

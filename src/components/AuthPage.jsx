@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AuthPage.css';
 import SocialLogin from './SocialLogin';
+import NotificationModal from './NotificationModal';
 
 const AuthPage = () => {
     const navigate = useNavigate();
@@ -10,6 +11,13 @@ const AuthPage = () => {
         name: '',
         email: '',
         password: '',
+    });
+    const [modalConfig, setModalConfig] = useState({
+        isOpen: false,
+        type: 'success',
+        title: '',
+        message: '',
+        navTo: ''
     });
 
     const toggleMode = () => {
@@ -46,17 +54,33 @@ const AuthPage = () => {
             localStorage.setItem('token', data.token);
             localStorage.setItem('user', JSON.stringify(data.user));
 
-            alert(isLogin ? `Welcome back, ${data.user.name}!` : `Account created for ${data.user.name}!`);
+            setModalConfig({
+                isOpen: true,
+                type: 'success',
+                title: isLogin ? 'Welcome Back!' : 'Success!',
+                message: isLogin
+                    ? `Great to see you again, ${data.user.name.split(' ')[0]}!`
+                    : `Your account is ready, ${data.user.name.split(' ')[0]}! Let's get started on your job journey.`,
+                navTo: data.user.isOnboarded ? '/dashboard' : '/onboarding'
+            });
 
-            // Redirect based on onboarding status
-            if (data.user.isOnboarded) {
-                navigate('/dashboard');
-            } else {
-                navigate('/onboarding');
-            }
         } catch (error) {
             console.error('Auth Error:', error);
-            alert(error.message);
+            setModalConfig({
+                isOpen: true,
+                type: 'error',
+                title: 'Oops!',
+                message: error.message || 'Authentication failed. Please check your credentials.',
+                navTo: null
+            });
+        }
+    };
+
+    const handleModalConfirm = () => {
+        const { navTo } = modalConfig;
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+        if (navTo) {
+            navigate(navTo);
         }
     };
 
@@ -129,6 +153,14 @@ const AuthPage = () => {
 
                 <SocialLogin />
             </div>
+
+            <NotificationModal
+                isOpen={modalConfig.isOpen}
+                type={modalConfig.type}
+                title={modalConfig.title}
+                message={modalConfig.message}
+                onConfirm={handleModalConfirm}
+            />
         </div>
     );
 };

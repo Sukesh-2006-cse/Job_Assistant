@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './ButlerCard.module.css';
 
-const ButlerCard = ({ job, onMarkDone, index }) => {
+const ButlerCard = ({ job, onMarkDone, onGenerateBrief, index }) => {
     const navigate = useNavigate();
     const [isVisible, setIsVisible] = useState(false);
     const [isDone, setIsDone] = useState(false);
@@ -71,6 +71,13 @@ const ButlerCard = ({ job, onMarkDone, index }) => {
                     onClick={() => navigate('/jobs/' + job._id)}
                 >
                     View Details
+                </button>
+                <button
+                    className={styles.briefBtn}
+                    onClick={() => onGenerateBrief(job)}
+                    title="Generate AI Brief for this action"
+                >
+                    ✨ Brief
                 </button>
             </div>
         </div>

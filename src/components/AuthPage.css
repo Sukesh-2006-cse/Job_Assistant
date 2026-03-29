@@ -20,8 +20,9 @@
 }
 
 .auth-card:hover {
-  transform: translate(-2px, -2px);
+  transform: translate(-3px, -3px);
   box-shadow: 6px 6px 0px 0px #000000;
+  will-change: transform;
 }
 
 .auth-header {
@@ -95,6 +96,7 @@
 .auth-button:hover {
   transform: translate(-2px, -2px);
   box-shadow: 6px 6px 0px 0px #000000;
+  will-change: transform;
 }
 
 .auth-button:active {

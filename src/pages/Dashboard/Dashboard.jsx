@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import styles from './Dashboard.module.css';
 import StatsBar from '../../components/StatsBar/StatsBar';
 import ButlerCard from '../../components/ButlerCard/ButlerCard';
 import Navigation from '../../components/Navigation/Navigation';
-import { getButlerToday, markActionDone, getBriefing, generateBriefing } from '../../api/butlerApi';
+import NotificationModal from '../../components/NotificationModal';
+import { getButlerToday, markActionDone, getBriefing, generateBriefing, runOrchestrator } from '../../api/butlerApi';
 import { TRIGGERS } from '../../constants/triggers';
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const [actions, setActions] = useState([]);
     const [stats, setStats] = useState({
         totalJobs: 0,
@@ -21,6 +23,13 @@ const Dashboard = () => {
     const [error, setError] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
     const [generatingBriefing, setGeneratingBriefing] = useState(false);
+    const [modalConfig, setModalConfig] = useState({
+        isOpen: false,
+        type: 'success',
+        title: '',
+        message: '',
+        navTo: null
+    });
 
     const fetchDashboard = useCallback(async (isSilent = false) => {
         if (!isSilent) setRefreshing(true);
@@ -94,11 +103,47 @@ const Dashboard = () => {
         try {
             await generateBriefing();
             const data = await getBriefing();
-            setBriefing(data.briefing);
+            if (data.briefing) {
+                setBriefing(data.briefing);
+                setModalConfig({
+                    isOpen: true,
+                    type: 'success',
+                    title: 'Briefing Generated!',
+                    message: data.briefing.message,
+                    navTo: null
+                });
+            }
         } catch (err) {
             console.error('Briefing Generation Error:', err);
         } finally {
             setGeneratingBriefing(false);
+        }
+    };
+
+    const handleActionBrief = async (job) => {
+        setRefreshing(true);
+        try {
+            const data = await runOrchestrator(TRIGGERS.ASK_BUTLER, { job });
+            if (data && data.suggestion) {
+                setModalConfig({
+                    isOpen: true,
+                    type: 'success',
+                    title: `Butler's Advice: ${job.company}`,
+                    message: data.suggestion,
+                    navTo: null
+                });
+            }
+        } catch (err) {
+            console.error('Action Brief Error:', err);
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
+    const handleModalConfirm = () => {
+        setModalConfig(prev => ({ ...prev, isOpen: false }));
+        if (modalConfig.navTo) {
+            navigate(modalConfig.navTo);
         }
     };
 
@@ -213,6 +258,7 @@ const Dashboard = () => {
                                 job={action}
                                 index={index}
                                 onMarkDone={handleMarkDone}
+                                onGenerateBrief={handleActionBrief}
                             />
                         ))}
                     </div>
@@ -222,6 +268,14 @@ const Dashboard = () => {
                     View all applications →
                 </Link>
             </div>
+
+            <NotificationModal
+                isOpen={modalConfig.isOpen}
+                type={modalConfig.type}
+                title={modalConfig.title}
+                message={modalConfig.message}
+                onConfirm={handleModalConfirm}
+            />
         </div>
     );
 };
