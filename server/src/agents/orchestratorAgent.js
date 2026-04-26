@@ -9,7 +9,11 @@ const resumeAgent = require('./resumeAgent');
 const careerAgent = require('./careerAgent');
 const dailyBriefingAgent = require('./dailyBriefingAgent');
 const coverLetterAgent = require('./coverLetterAgent');
+const marketIntelligenceAgent = require('./marketIntelligenceAgent');
 const memoryStore = require('../memory/memoryStore');
+const { emitToUser } = require('../utils/sseEmitter');
+const { aggregateJobs } = require('../services/jobAggregator');
+const { rebuildUserContext, getContextStatus } = require('../rag/contextManager');
 
 class OrchestratorAgent extends BaseAgent {
     constructor() {
@@ -59,24 +63,96 @@ class OrchestratorAgent extends BaseAgent {
     async handleDashboardOpen(userId, context) {
         const { jobs = [], profile = null } = context;
 
-        const [followUpRes, jobMatchRes, careerInsight] = await Promise.allSettled([
+        // Build search query from user's preferred roles
+        const searchQuery = (profile?.preferences?.preferredRoles || ['software engineer'])[0] || 'software engineer';
+
+        // Emit: market intelligence starting
+        emitToUser(userId, 'agent_activity', {
+            icon: '📊',
+            agentName: 'Market Intelligence Agent',
+            message: 'Fetching live market data...',
+            status: 'running',
+        });
+
+        // Fetch raw jobs from external APIs (for market intelligence)
+        let rawJobs = [];
+        try {
+            rawJobs = await aggregateJobs(searchQuery);
+            emitToUser(userId, 'agent_activity', {
+                icon: '📊',
+                agentName: 'Market Intelligence Agent',
+                message: `Analysing ${rawJobs.length} live listings...`,
+                status: 'running',
+            });
+        } catch (aggErr) {
+            console.error('[Orchestrator] Job aggregation failed:', aggErr.message);
+        }
+
+        // RAG Context Sync Step
+        emitToUser(userId, 'agent_activity', {
+            icon: '🧠',
+            agentName: 'RAG Engine',
+            message: 'Syncing personalised context...',
+            status: 'running',
+        });
+
+        const ragStatus = await getContextStatus(userId.toString());
+        if (ragStatus.chunkCount < 3) {
+            console.log(`[Orchestrator] RAG context insufficient (${ragStatus.chunkCount} chunks), rebuilding...`);
+            const rebuildRes = await rebuildUserContext(userId.toString());
+            emitToUser(userId, 'agent_activity', {
+                icon: '✅',
+                agentName: 'RAG Engine',
+                message: `Context built — ${rebuildRes.chunksStored} knowledge chunks stored in pgvector`,
+                status: 'done',
+            });
+        } else {
+            emitToUser(userId, 'agent_activity', {
+                icon: '✅',
+                agentName: 'RAG Engine',
+                message: `Context ready — ${ragStatus.chunkCount} chunks in pgvector`,
+                status: 'done',
+            });
+        }
+
+        // Run existing agents + market intelligence in parallel
+        const [followUpRes, jobMatchRes, careerInsight, marketIntelRes] = await Promise.allSettled([
             this.safeRun(followUpAgent, { userId, jobs }),
             this.safeRun(jobMatchAgent, { userId, profile }),
-            this.readMemory(userId, 'careerInsight')
+            this.readMemory(userId, 'careerInsight'),
+            this.safeRun(marketIntelligenceAgent, { userId, profile, rawJobs }),
         ]);
 
         const stats = this.calculateStats(jobs, followUpRes.status === 'fulfilled' ? followUpRes.value : []);
 
-        // 1. Fix memory key and agent scope
-        let briefing = await memoryStore.readMemory(userId, 'dailyBriefingAgent', 'daily_briefing');
+        // Extract market signals from result
+        let marketSignals = [];
+        let signalsSource = 'generated';
+        let signalsGenerationMs = null;
 
-        // 2. Live Sync: Update snapshot counts with current reality
+        if (marketIntelRes.status === 'fulfilled' && marketIntelRes.value) {
+            const miResult = marketIntelRes.value;
+            marketSignals = miResult.signals || [];
+            signalsSource = miResult.source || 'generated';
+            signalsGenerationMs = miResult.generationMs || null;
+        }
+
+        // Emit: market intelligence done
+        const cacheMsg = signalsSource === 'cache' ? 'Loaded' : 'Generated';
+        emitToUser(userId, 'agent_activity', {
+            icon: '✅',
+            agentName: 'Market Intelligence Agent',
+            message: `${cacheMsg} ${marketSignals.length} market signals`,
+            status: 'done',
+        });
+
+        // Daily briefing (memory-backed)
+        let briefing = await memoryStore.readMemory(userId, 'dailyBriefingAgent', 'daily_briefing');
         if (briefing) {
             briefing = {
                 ...briefing,
                 followUpCount: stats.followUpsDue,
                 interviewCount: stats.totalInterview,
-                // We keep the message from the morning but keep the pills live
             };
         }
 
@@ -85,7 +161,10 @@ class OrchestratorAgent extends BaseAgent {
             jobMatches: jobMatchRes.status === 'fulfilled' && Array.isArray(jobMatchRes.value) ? jobMatchRes.value.slice(0, 3) : [],
             careerInsight: careerInsight.status === 'fulfilled' ? careerInsight.value : null,
             stats,
-            briefing: briefing || null
+            briefing: briefing || null,
+            marketSignals,
+            signalsSource,
+            signalsGenerationMs,
         };
     }
 

@@ -1,13 +1,42 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
     BotMessageSquare, X, Trash2, Send,
-    Briefcase, ChevronDown, Loader2
+    Briefcase, ChevronDown, Loader2, Brain, Info
 } from 'lucide-react';
 import styles from './ButlerChat.module.css';
 import { useButlerChat } from '../../hooks/useButlerChat';
 
+// Development Mode Panel for RAG Contexts
+const DevContext = ({ contexts }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    if (!contexts || contexts.length === 0) return null;
+
+    return (
+        <div className={styles.devContext}>
+            <div className={styles.devToggle} onClick={() => setIsExpanded(!isExpanded)}>
+                <Info size={10} />
+                <span>pgvector retrieved {contexts.length} chunks</span>
+                <ChevronDown size={10} style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }} />
+            </div>
+            {isExpanded && (
+                <div className={styles.contextList}>
+                    {contexts.map((c, i) => (
+                        <div key={i} className={styles.contextItem}>
+                            <span className={styles.contextType}>{c.type}</span>
+                            <span className={styles.contextScore}>{c.score} similarity</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const ButlerChat = () => {
-    const { messages, isOpen, isLoading, suggestions, toggleChat, sendMessage, clearChat } = useButlerChat();
+    const {
+        messages, isOpen, isLoading, suggestions,
+        ragStatus, toggleChat, sendMessage, clearChat
+    } = useButlerChat();
     const [inputValue, setInputValue] = useState('');
     const inputRef = useRef(null);
     const bottomRef = useRef(null);
@@ -62,6 +91,21 @@ const ButlerChat = () => {
                             </div>
                         </div>
                         <div className={styles.headerRight}>
+                            {/* RAG Status Pill */}
+                            <div className={`${styles.ragPill} ${ragStatus.hasContext ? styles.ragActive : styles.ragBuilding}`}>
+                                {ragStatus.loading ? (
+                                    <Loader2 size={10} className={styles.spin} />
+                                ) : (
+                                    <Brain size={12} />
+                                )}
+                                <span>{ragStatus.hasContext ? 'RAG Active' : 'Building...'}</span>
+                                <div className={styles.ragTooltip}>
+                                    {ragStatus.hasContext
+                                        ? `${ragStatus.chunkCount} vectors in pgvector`
+                                        : 'Generating your knowledge base...'}
+                                </div>
+                            </div>
+
                             <button
                                 className={styles.headerBtn}
                                 onClick={clearChat}
@@ -124,6 +168,12 @@ const ButlerChat = () => {
                                                 <span className={styles.cursor} />
                                             )}
                                         </div>
+
+                                        {/* Dev Context Panel (visible in dev mode only) */}
+                                        {import.meta.env.DEV && msg.role === 'assistant' && (
+                                            <DevContext contexts={msg.contexts} />
+                                        )}
+
                                         <div className={`${styles.ts} ${msg.role === 'user' ? styles.tsRight : ''}`}>
                                             {formatTime(msg.timestamp)}
                                         </div>

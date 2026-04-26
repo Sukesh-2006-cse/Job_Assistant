@@ -153,6 +153,59 @@
     transform: translate(1px, 1px);
 }
 
+/* RAG Status Pill */
+.ragPill {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border: 2px solid var(--border-color);
+    box-shadow: 2px 2px 0px #000;
+    margin-right: 8px;
+    cursor: default;
+    position: relative;
+}
+
+.ragActive {
+    background: var(--accent-green);
+    color: black;
+}
+
+.ragBuilding {
+    background: var(--accent-yellow);
+    color: black;
+}
+
+.ragPill:hover .ragTooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+.ragTooltip {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    background: black;
+    color: white;
+    padding: 6px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s;
+    z-index: 10;
+    pointer-events: none;
+    font-size: 9px;
+    text-transform: none;
+    letter-spacing: normal;
+}
+
 /* ─────────────────────────────────────────
    Messages Area
 ───────────────────────────────────────── */
@@ -301,7 +354,49 @@
 .bubbleWrap {
     display: flex;
     flex-direction: column;
-    max-width: 75%;
+    max-width: 80%;
+}
+
+/* Dev Context Panel */
+.devContext {
+    margin-top: 6px;
+    border-left: 2px solid #ddd;
+    padding-left: 8px;
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.devToggle {
+    font-size: 10px;
+    color: #888;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 600;
+}
+
+.contextList {
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.contextItem {
+    font-size: 10px;
+    color: #666;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.contextType {
+    font-weight: 700;
+    color: var(--accent-purple);
+}
+
+.contextScore {
+    color: #999;
 }
 
 .userSpacer {

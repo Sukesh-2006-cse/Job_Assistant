@@ -5,8 +5,10 @@ import StatsBar from '../../components/StatsBar/StatsBar';
 import ButlerCard from '../../components/ButlerCard/ButlerCard';
 import Navigation from '../../components/Navigation/Navigation';
 import NotificationModal from '../../components/NotificationModal';
+import MarketPulse from '../../components/MarketPulse/MarketPulse';
 import { Sparkles, RefreshCw, Sunrise, CheckCircle } from 'lucide-react';
 import { getButlerToday, markActionDone, getBriefing, generateBriefing, runOrchestrator } from '../../api/butlerApi';
+import { getMarketSignals } from '../../api/analyticsApi';
 import { TRIGGERS } from '../../constants/triggers';
 
 const Dashboard = () => {
@@ -32,52 +34,89 @@ const Dashboard = () => {
         navTo: null
     });
 
+    // Market Intelligence state
+    const [marketSignals, setMarketSignals] = useState([]);
+    const [signalsLoading, setSignalsLoading] = useState(true);
+    const [signalsCachedAt, setSignalsCachedAt] = useState(null);
+    const [signalsSource, setSignalsSource] = useState('generated');
+    const [signalsGenerationMs, setSignalsGenerationMs] = useState(null);
+
+    const CACHE_KEY = 'butler_dashboard_cache';
+    const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+    const saveDashboardCache = (data) => {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, savedAt: Date.now() }));
+    };
+
+    const loadDashboardCache = () => {
+        try {
+            const raw = sessionStorage.getItem(CACHE_KEY);
+            if (!raw) return null;
+            const cached = JSON.parse(raw);
+            if (Date.now() - cached.savedAt > CACHE_TTL_MS) return null; // expired
+            return cached;
+        } catch { return null; }
+    };
+
+    const applyDashboardData = (butlerData, briefingData) => {
+        if (butlerData?.stats) {
+            setActions(butlerData.actions || []);
+            setStats(butlerData.stats);
+            if (Array.isArray(butlerData.marketSignals)) {
+                setMarketSignals(butlerData.marketSignals);
+                setSignalsSource(butlerData.signalsSource || 'generated');
+                setSignalsGenerationMs(butlerData.signalsGenerationMs || null);
+                setSignalsCachedAt(new Date().toISOString());
+            }
+            setSignalsLoading(false);
+            if (briefingData?.briefing) {
+                setBriefing({
+                    ...briefingData.briefing,
+                    followUpCount: butlerData.stats.followUpsDue || 0,
+                    interviewCount: butlerData.stats.totalInterview || 0,
+                    totalJobs: butlerData.stats.totalJobs || 0,
+                    jobMatchesCount: butlerData.jobMatches ? butlerData.jobMatches.length : 0
+                });
+            } else {
+                setBriefing(null);
+            }
+        }
+    };
+
     const fetchDashboard = useCallback(async (isSilent = false) => {
         if (!isSilent) setRefreshing(true);
         try {
-            console.log('[Dashboard] Fetching data...');
+            console.log('[Dashboard] Fetching fresh data...');
             const butlerData = await getButlerToday();
-            console.log('[Dashboard] Butler Data:', butlerData);
-
             let briefingData = { briefing: null };
-            try {
-                briefingData = await getBriefing();
-                console.log('[Dashboard] Briefing Data:', briefingData);
-            } catch (bErr) {
-                console.warn('[Dashboard] Optional Briefing fetch failed:', bErr);
-            }
+            try { briefingData = await getBriefing(); } catch { }
 
-            if (butlerData && butlerData.stats) {
-                setActions(butlerData.actions || []);
-                setStats(butlerData.stats);
-
-                // Sync briefing counts if available
-                if (briefingData && briefingData.briefing) {
-                    const synced = {
-                        ...briefingData.briefing,
-                        followUpCount: butlerData.stats.followUpsDue || 0,
-                        interviewCount: butlerData.stats.totalInterview || 0,
-                        totalJobs: butlerData.stats.totalJobs || 0,
-                        jobMatchesCount: butlerData.jobMatches ? butlerData.jobMatches.length : 0
-                    };
-                    setBriefing(synced);
-                } else {
-                    setBriefing(null);
-                }
-            }
-
+            applyDashboardData(butlerData, briefingData);
+            saveDashboardCache({ butlerData, briefingData });
             setError(null);
         } catch (err) {
             console.error('Dashboard Load Error:', err);
-            setError("Could not load your dashboard. Please try again.");
+            if (!isSilent) setError("Could not load your dashboard. Please try again.");
         } finally {
             if (!isSilent) setRefreshing(false);
             setLoading(false);
+            setSignalsLoading(false);
         }
     }, []);
 
     useEffect(() => {
-        fetchDashboard();
+        // 1. Load cached data immediately (instant render)
+        const cached = loadDashboardCache();
+        if (cached) {
+            console.log('[Dashboard] Serving from cache instantly');
+            applyDashboardData(cached.butlerData, cached.briefingData);
+            setLoading(false);
+            // 2. Silently refresh in background to keep data current
+            fetchDashboard(true);
+        } else {
+            // No cache → full load with skeleton
+            fetchDashboard(false);
+        }
 
         const handleFocus = () => fetchDashboard(true);
         window.addEventListener('focus', handleFocus);
@@ -96,6 +135,23 @@ const Dashboard = () => {
             }));
         } catch (err) {
             console.error('Action Update Error:', err);
+        }
+    };
+
+    const handleRefreshSignals = async () => {
+        setSignalsLoading(true);
+        try {
+            const data = await getMarketSignals();
+            if (data) {
+                setMarketSignals(data.signals || []);
+                setSignalsSource(data.source || 'generated');
+                setSignalsGenerationMs(data.generationMs || null);
+                setSignalsCachedAt(data.cachedAt || new Date().toISOString());
+            }
+        } catch (err) {
+            console.error('[Dashboard] Market signals refresh error:', err);
+        } finally {
+            setSignalsLoading(false);
         }
     };
 
@@ -183,7 +239,7 @@ const Dashboard = () => {
                         </button>
                         <button
                             className={`${styles.refreshBtn} ${refreshing ? styles.spinning : ''}`}
-                            onClick={() => fetchDashboard()}
+                            onClick={() => { sessionStorage.removeItem('butler_dashboard_cache'); fetchDashboard(); }}
                             title="Refresh Dashboard"
                         >
                             <RefreshCw size={18} />
@@ -225,6 +281,15 @@ const Dashboard = () => {
                 )}
 
                 <StatsBar stats={stats} />
+
+                <MarketPulse
+                    signals={marketSignals}
+                    loading={signalsLoading}
+                    cachedAt={signalsCachedAt}
+                    onRefresh={handleRefreshSignals}
+                    source={signalsSource}
+                    generationMs={signalsGenerationMs}
+                />
 
                 <hr className={styles.divider} />
 

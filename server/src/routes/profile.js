@@ -6,6 +6,7 @@ const authMiddleware = require('../middleware/auth');
 const Profile = require('../../models/Profile');
 const orchestratorAgent = require('../agents/orchestratorAgent');
 const { TRIGGERS } = require('../agents/agentConfig');
+const { rebuildUserContext } = require('../rag/contextManager');
 
 // Configure Multer for memory storage
 const upload = multer({
@@ -57,6 +58,9 @@ router.post('/upload-resume', authMiddleware, upload.single('resume'), async (re
             message: 'Profile updated from resume',
             extracted: result.extracted
         });
+
+        // Rebuild RAG context (fire and forget)
+        rebuildUserContext(req.user.id).catch(e => console.error('[Profile] RAG Rebuild Error:', e));
     } catch (error) {
         console.error('Resume Upload Error:', error);
         res.status(500).json({ error: 'Failed to process resume', details: error.message });
@@ -89,6 +93,10 @@ router.post('/onboarding', async (req, res) => {
 
         await newProfile.save();
         await User.findByIdAndUpdate(userId, { isOnboarded: true });
+
+        // Build RAG context for the first time (fire and forget)
+        rebuildUserContext(userId).catch(e => console.error('[Profile] RAG Rebuild Error:', e));
+
         res.status(201).json({ message: 'Profile saved successfully' });
     } catch (error) {
         console.error('Error saving profile:', error);

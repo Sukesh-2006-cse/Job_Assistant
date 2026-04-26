@@ -4,6 +4,7 @@ const Job = require('../../models/Job');
 const authMiddleware = require('../middleware/auth');
 const orchestratorAgent = require('../agents/orchestratorAgent');
 const { TRIGGERS } = require('../agents/agentConfig');
+const { updateJobChunk, deleteJobChunk } = require('../rag/contextManager');
 
 // GET /api/jobs - Fetch all job applications for user
 router.get('/', authMiddleware, async (req, res) => {
@@ -35,6 +36,10 @@ router.post('/', authMiddleware, async (req, res) => {
         });
 
         const savedJob = await newJob.save();
+
+        // Update RAG context (fire and forget)
+        updateJobChunk(req.user.id, savedJob).catch(e => console.error('[Jobs] RAG Update Error:', e));
+
         res.status(201).json(savedJob);
     } catch (error) {
         res.status(500).json({ error: 'Failed to create job', details: error.message });
@@ -69,6 +74,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
         const updatedJob = await job.save();
 
+        // Update RAG context (fire and forget)
+        updateJobChunk(req.user.id, updatedJob).catch(e => console.error('[Jobs] RAG Update Error:', e));
+
         // Trigger Interview Prep in background if status changed to Interview
         if (updates.status === 'Interview') {
             orchestratorAgent.run({
@@ -99,6 +107,10 @@ router.delete('/:id', authMiddleware, async (req, res) => {
         }
 
         await Job.findByIdAndDelete(req.params.id);
+
+        // Delete RAG context (fire and forget)
+        deleteJobChunk(req.user.id, req.params.id).catch(e => console.error('[Jobs] RAG Delete Error:', e));
+
         res.json({ success: true, message: 'Job deleted' });
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete job' });

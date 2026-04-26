@@ -1,0 +1,105 @@
+.card {
+    background: #fff;
+    border: 2px solid #000;
+    box-shadow: 3px 3px 0 #000;
+    border-radius: 0;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.3s ease, transform 0.3s ease, box-shadow 0.15s ease;
+}
+
+.card.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.card:hover {
+    box-shadow: 5px 5px 0 #000;
+}
+
+/* Top Row */
+.topRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.typeGroup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.icon {
+    font-size: 20px;
+    line-height: 1;
+}
+
+.typeBadge {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border: 2px solid #000;
+    border-radius: 0;
+    white-space: nowrap;
+}
+
+.severityDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(0, 0, 0, 0.25);
+    flex-shrink: 0;
+}
+
+/* Message + Detail */
+.message {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111;
+    line-height: 1.45;
+    margin: 0;
+}
+
+.detail {
+    font-size: 13px;
+    color: #555;
+    line-height: 1.4;
+    margin: 0;
+}
+
+/* Action Button */
+.actionBtn {
+    margin-top: auto;
+    align-self: flex-start;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 12px;
+    background: #fff;
+    color: #111;
+    border: 2px solid #000;
+    box-shadow: 2px 2px 0 #000;
+    border-radius: 0;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, box-shadow 0.12s;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.actionBtn:hover {
+    background: #000;
+    color: #fff;
+    box-shadow: 1px 1px 0 #000;
+}
+
+.actionBtn:active {
+    box-shadow: none;
+    transform: translate(2px, 2px);
+}

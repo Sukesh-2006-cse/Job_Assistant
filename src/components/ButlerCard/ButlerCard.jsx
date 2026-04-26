@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, Sparkles, Check, Eye } from 'lucide-react';
 import styles from './ButlerCard.module.css';

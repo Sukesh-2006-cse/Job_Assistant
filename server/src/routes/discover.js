@@ -67,7 +67,7 @@ router.post('/generate-cover-letter', authMiddleware, async (req, res) => {
 
 // --- Existing Discovery Logic (Migrated from server.js) ---
 
-router.get('/jobs', async (req, res) => {
+router.get('/jobs', authMiddleware, async (req, res) => {
     const { query } = req.query;
     if (!query) return res.status(400).json({ error: 'Query parameter is required' });
 
@@ -80,6 +80,15 @@ router.get('/jobs', async (req, res) => {
         ]);
 
         const allJobs = [...jSearch, ...adzuna, ...remotive, ...muse];
+
+        // Update RAG context with latest discovery results (fire and forget)
+        const userId = req.user?.id || req.user?._id;
+        if (userId) {
+            const topJobs = allJobs.slice(0, 10);
+            const { storeDiscoveryChunk } = require('../rag/contextManager');
+            storeDiscoveryChunk(userId, topJobs).catch(e => console.error('[Discover] RAG Update Error:', e));
+        }
+
         res.json(allJobs);
     } catch (error) {
         console.error('Aggregator Error:', error);
@@ -96,17 +105,29 @@ const fetchJSearchJobs = async (query) => {
                 'X-RapidAPI-Host': 'jsearch.p.rapidapi.com'
             }
         });
-        return response.data.data.map(job => ({
-            id: job.job_id,
-            title: job.job_title,
-            company: job.employer_name,
-            location: `${job.job_city || ''} ${job.job_country || ''}`,
-            type: job.job_employment_type,
-            url: job.job_apply_link,
-            source: 'JSearch (LinkedIn/Indeed)',
-            logo: job.employer_logo,
-            description: job.job_description || "Professional job opportunity. Click 'View & Apply' to read the full description and requirements on the company website."
-        }));
+        return response.data.data.map(job => {
+            let salary = null;
+            if (job.job_min_salary && job.job_max_salary) {
+                const currency = job.job_salary_currency || 'USD';
+                salary = `${currency} ${Number(job.job_min_salary).toLocaleString()} – ${Number(job.job_max_salary).toLocaleString()}`;
+                if (job.job_salary_period) salary += ` / ${job.job_salary_period}`;
+            } else if (job.job_min_salary) {
+                const currency = job.job_salary_currency || 'USD';
+                salary = `${currency} ${Number(job.job_min_salary).toLocaleString()}+`;
+            }
+            return {
+                id: job.job_id,
+                title: job.job_title,
+                company: job.employer_name,
+                location: `${job.job_city || ''} ${job.job_country || ''}`,
+                type: job.job_employment_type,
+                url: job.job_apply_link,
+                source: 'JSearch (LinkedIn/Indeed)',
+                logo: job.employer_logo,
+                salary,
+                description: job.job_description || "Professional job opportunity. Click 'View & Apply' to read the full description and requirements on the company website."
+            };
+        });
     } catch (error) {
         console.error('JSearch Error:', error.message);
         return [];
@@ -123,17 +144,26 @@ const fetchAdzunaJobs = async (query) => {
                 what: query
             }
         });
-        return response.data.results.map(job => ({
-            id: job.id,
-            title: job.title,
-            company: job.company.display_name,
-            location: job.location.display_name,
-            type: job.contract_type || 'Full-time',
-            url: job.redirect_url,
-            source: 'Adzuna',
-            logo: null,
-            description: job.description || "Detailed job listing on Adzuna. View the full posting for more information about this role and company."
-        }));
+        return response.data.results.map(job => {
+            let salary = null;
+            if (job.salary_min && job.salary_max) {
+                salary = `£${Number(job.salary_min).toLocaleString()} – £${Number(job.salary_max).toLocaleString()} / year`;
+            } else if (job.salary_min) {
+                salary = `£${Number(job.salary_min).toLocaleString()}+ / year`;
+            }
+            return {
+                id: job.id,
+                title: job.title,
+                company: job.company.display_name,
+                location: job.location.display_name,
+                type: job.contract_type || 'Full-time',
+                url: job.redirect_url,
+                source: 'Adzuna',
+                logo: null,
+                salary,
+                description: job.description || "Detailed job listing on Adzuna. View the full posting for more information about this role and company."
+            };
+        });
     } catch (error) {
         console.error('Adzuna Error:', error.message);
         return [];

@@ -153,6 +153,13 @@
     box-shadow: 7px 7px 0px 0px #000000;
 }
 
+.skeletonTitle {
+    height: 40px;
+    width: 260px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+}
+
 .skeleton {
     background: white;
     border: var(--border-width) solid var(--border-color);
@@ -227,6 +234,7 @@
     transform: translate(-2px, -2px);
     box-shadow: 5px 5px 0px 0px #000000;
 }
+
 /* Briefing Styles */
 .headerActions {
     display: flex;
@@ -271,8 +279,15 @@
 }
 
 @keyframes slideDown {
-    from { transform: translateY(-20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .briefingLeft {

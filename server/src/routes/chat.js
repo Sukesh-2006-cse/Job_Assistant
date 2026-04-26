@@ -1,9 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
+const { getButlerActions } = require('../utils/butlerEngine');
+const {
+    getContextStatus,
+    retrieveRelevantChunks,
+    rebuildUserContext,
+    storeChatHistory
+} = require('../rag/contextManager');
 const Job = require('../../models/Job');
 const Profile = require('../../models/Profile');
-const { getButlerActions } = require('../utils/butlerEngine');
 
 // Use same AI SDK pattern as the rest of the project
 const { groq } = require('@ai-sdk/groq');
@@ -27,61 +33,48 @@ router.post('/message', authMiddleware, async (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
 
     try {
-        // Step 2 — Fetch user context from MongoDB in parallel
         const userId = req.user._id || req.user.id;
-        let jobs = [];
-        let profile = null;
 
-        try {
-            [jobs, profile] = await Promise.all([
-                Job.find({ userId }),
-                Profile.findOne({ userId })
-            ]);
-        } catch (dbErr) {
-            console.error('[Chat] DB fetch error (continuing):', dbErr.message);
+        // Fetch jobs and profile (as requested for the route context)
+        const [jobs, profile] = await Promise.all([
+            Job.find({ userId }),
+            Profile.findOne({ userId })
+        ]);
+
+        // Step 2 — Ensure context exists
+        const status = await getContextStatus(userId.toString());
+        if (status.chunkCount === 0) {
+            console.log('[Chat] Context empty, building fresh RAG context...');
+            await rebuildUserContext(userId.toString());
         }
 
-        // Step 3 — Build context-aware system prompt
-        const now = Date.now();
-        const butlerActions = getButlerActions(jobs || []);
-        const highPriorityActions = butlerActions.filter(a => a.priority === 'High');
-        const interviews = (jobs || []).filter(j => j.status === 'Interview');
-        const offers = (jobs || []).filter(j => j.status === 'Offer');
+        // Step 3 — Retrieve relevant chunks from PostgreSQL
+        const relevantChunks = await retrieveRelevantChunks(userId.toString(), message, 5);
 
-        const jobListContext = (jobs || []).map(job => {
-            const daysSince = Math.floor((now - new Date(job.appliedDate)) / 86400000);
-            return `  - ${job.company} (${job.role}) — Status: ${job.status}, Applied ${daysSince} days ago`;
-        }).join('\n');
+        // Expose retrieved context types and scores in a header for frontend dev mode
+        if (relevantChunks.length > 0) {
+            const contextMeta = relevantChunks.map(c => ({ type: c.chunkType, score: c.score }));
+            res.setHeader('X-Rag-Contexts', JSON.stringify(contextMeta));
+            res.setHeader('Access-Control-Expose-Headers', 'X-Rag-Contexts');
+        }
 
-        const skills = profile?.skills?.join(', ') || 'not specified';
-        const preferredRoles = profile?.preferredRoles?.join(', ') || 'not specified';
-        const experienceLevel = profile?.experienceLevel || 'not specified';
+        // Step 4 — Build context-aware RAG system prompt
+        const ragContextText = relevantChunks.map(chunk =>
+            `--- ${chunk.chunkType.toUpperCase()} ---\n${chunk.text}`
+        ).join('\n\n');
 
-        const systemPrompt = `You are Butler, a personal AI career assistant inside Apply-Flow, a job application tracking app. You have full context about the user's job search and help them stay on top of applications, prepare for interviews, write follow-up emails, and get career advice.
+        const systemPrompt = `You are Butler, an intelligent personal career assistant inside Apply-Flow. You have deep knowledge of this user's job search from the retrieved context below. 
 
-Be helpful, concise, and encouraging. Use job-search metaphors occasionally. Keep responses under 150 words unless the user asks for something long like a complete email draft.
+Always reference specific companies, roles, and dates from the context when answering. Never invent jobs or skills not present in the context. Be concise and actionable — under 120 words unless writing a full email draft.
 
-USER'S JOB SEARCH CONTEXT:
-- Total jobs tracked: ${jobs ? jobs.length : 0}
-- High priority follow-ups due today: ${highPriorityActions.length}
-- Active interviews: ${interviews.length}
-- Offers awaiting response: ${offers.length}
-
-JOB APPLICATIONS:
-${jobListContext || '  (No applications tracked yet — encourage the user to add their applications)'}
-
-USER PROFILE:
-- Skills: ${skills}
-- Preferred roles: ${preferredRoles}
-- Experience level: ${experienceLevel}
+PERSONALISED CONTEXT (retrieved via vector search):
+${ragContextText || '(No relevant context found in your database)'}
 
 INSTRUCTIONS:
-- Always refer to companies and roles by their actual name from the context.
-- Never fabricate job listings not in the context.
-- If asked to write a follow-up email, write a complete ready-to-send email using the real company and role from context.
-- If context shows overdue follow-ups, proactively mention them.
-- If the user has no jobs, encourage them to add applications to Apply-Flow.
-- Be practical and action-oriented.`;
+- Use ONLY the context above to answer.
+- If context is insufficient say: "I don't have enough data on that yet — try adding more applications."
+- When writing emails, use exact company names and roles from the context.
+- When asked about priorities or "what should I do", refer to the butler_actions context if available.`;
 
         // Step 4 — Build messages array
         const messages = [
@@ -104,6 +97,10 @@ INSTRUCTIONS:
 
         res.end();
 
+        // Step 6 — Store chat history (fire and forget)
+        const combinedMessages = [...history, { role: 'user', content: message }, { role: 'assistant', content: '...' }]; // Note: simplified placeholder
+        storeChatHistory(userId.toString(), combinedMessages).catch(e => console.error('[Chat] History store error:', e));
+
     } catch (err) {
         console.error('[Chat] Stream error:', err.message, err.stack);
         try {
@@ -112,6 +109,36 @@ INSTRUCTIONS:
         } catch {
             // Response may already be closed
         }
+    }
+});
+
+// GET /api/chat/context-status (protected)
+router.get('/context-status', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        const status = await getContextStatus(userId.toString());
+        res.json({
+            hasContext: status.chunkCount > 0,
+            chunkCount: status.chunkCount,
+            chunkTypes: status.chunkTypes
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to get context status' });
+    }
+});
+
+// POST /api/chat/rebuild-context (protected)
+router.post('/rebuild-context', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        const result = await rebuildUserContext(userId.toString());
+        res.json({
+            success: true,
+            message: 'Context rebuilt',
+            chunksStored: result.chunksStored
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to rebuild context' });
     }
 });
 

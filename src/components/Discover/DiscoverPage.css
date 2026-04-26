@@ -201,6 +201,22 @@
     color: black;
 }
 
+.salary-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--accent-green, #a8ff78);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-weight: 800;
+    font-size: 0.88rem;
+    color: black;
+    box-shadow: 2px 2px 0px 0px #000000;
+    margin-bottom: 0.9rem;
+    width: fit-content;
+}
+
 .job-description {
     font-size: 0.95rem;
     color: #444;

@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/auth');
 const Job = require('../../models/Job');
+const Profile = require('../../models/Profile');
+const { aggregateJobs } = require('../services/jobAggregator');
+const marketIntelligenceAgent = require('../agents/marketIntelligenceAgent');
 
 // GET /api/analytics/summary
 router.get('/summary', authMiddleware, async (req, res) => {
@@ -118,5 +121,30 @@ function weekStartToLabel(date) {
     const weekOfMonth = Math.ceil(date.getDate() / 7);
     return `${month} W${weekOfMonth}`;
 }
+
+// GET /api/analytics/market-signals — Manual refresh of market intelligence signals
+router.get('/market-signals', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        const profile = await Profile.findOne({ userId });
+        if (!profile) return res.status(404).json({ error: 'Profile not found' });
+
+        const searchQuery = (profile?.preferences?.preferredRoles || ['software engineer'])[0] || 'software engineer';
+        const rawJobs = await aggregateJobs(searchQuery);
+
+        const result = await marketIntelligenceAgent.run({ userId, profile, rawJobs });
+        if (!result) return res.json({ signals: [], cachedAt: new Date(), source: 'generated', generationMs: null });
+
+        res.json({
+            signals: result.signals || [],
+            cachedAt: new Date(),
+            source: result.source || 'generated',
+            generationMs: result.generationMs || null,
+        });
+    } catch (err) {
+        console.error('[Analytics] market-signals error:', err.message);
+        res.status(500).json({ error: 'Failed to fetch market signals', signals: [] });
+    }
+});
 
 module.exports = router;

@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { sendChatMessage } from '../api/chatApi';
 import { getButlerToday } from '../api/butlerApi';
+import apiClient from '../api/apiClient';
 
 export function useButlerChat() {
     const [messages, setMessages] = useState([]);
@@ -13,15 +14,47 @@ export function useButlerChat() {
         "What skills am I missing?",
         "How is my job search going?"
     ]);
+    const [ragStatus, setRagStatus] = useState({ hasContext: false, chunkCount: 0, loading: true });
+
     const hasLoadedContextRef = useRef(false);
+
+    const fetchRagStatus = useCallback(async () => {
+        try {
+            setRagStatus(prev => ({ ...prev, loading: true }));
+            const { data } = await apiClient.get('/chat/context-status');
+            setRagStatus({ ...data, loading: false });
+
+            // If no context, trigger a rebuild in the background
+            if (data.chunkCount === 0) {
+                apiClient.post('/chat/rebuild-context')
+                    .then(res => {
+                        if (res.data.success && res.data.chunksStored > 0) {
+                            setRagStatus({ hasContext: true, chunkCount: res.data.chunksStored, loading: false });
+                        } else {
+                            setRagStatus({ hasContext: false, chunkCount: 0, loading: false });
+                        }
+                    })
+                    .catch(e => {
+                        console.error('[useButlerChat] Rebuild failed:', e);
+                        setRagStatus({ hasContext: false, chunkCount: 0, loading: false });
+                    });
+            }
+        } catch (err) {
+            console.error('[useButlerChat] Status Error:', err);
+            setRagStatus(prev => ({ ...prev, loading: false }));
+        }
+    }, []);
 
     const toggleChat = useCallback(async () => {
         setIsOpen(prev => {
             const nextOpen = !prev;
 
-            // Load context suggestions first time it opens
+            // Load context suggestions and RAG status first time it opens
             if (nextOpen && !hasLoadedContextRef.current) {
                 hasLoadedContextRef.current = true;
+
+                fetchRagStatus();
+
                 getButlerToday().then(data => {
                     if (!data) return;
                     const newSuggestions = [...suggestions];
@@ -47,7 +80,7 @@ export function useButlerChat() {
 
             return nextOpen;
         });
-    }, [suggestions]);
+    }, [suggestions, fetchRagStatus]);
 
     const sendMessage = useCallback(async (userMessageText) => {
         const text = typeof userMessageText === 'string' ? userMessageText.trim() : '';
@@ -55,13 +88,13 @@ export function useButlerChat() {
 
         setError(null);
 
-        // Build history from current messages (before adding new user msg)
+        // Build history from current messages
         const historyForApi = messages.slice(-10).map(m => ({
             role: m.role,
             content: m.content
         }));
 
-        // 1. Add user message immediately
+        // 1. Add user message
         const userMsg = {
             id: Date.now() + Math.random(),
             role: 'user',
@@ -74,14 +107,15 @@ export function useButlerChat() {
         // 2. Set loading
         setIsLoading(true);
 
-        // 3. Add streaming placeholder for assistant
+        // 3. Add assistant placeholder
         const assistantMsgId = Date.now() + Math.random() + 1;
         const assistantMsg = {
             id: assistantMsgId,
             role: 'assistant',
             content: '',
             streaming: true,
-            timestamp: new Date()
+            timestamp: new Date(),
+            contexts: [] // Placeholder for RAG metadata
         };
         setMessages(prev => [...prev, assistantMsg]);
 
@@ -89,8 +123,18 @@ export function useButlerChat() {
             // 5. Call streaming fetch
             const response = await sendChatMessage(text, historyForApi);
 
-            // 6. First chunk arrived — clear loading spinner
+            // Extract context metadata from header
+            const contextHeader = response.headers.get('X-Rag-Contexts');
+            let contexts = [];
+            if (contextHeader) {
+                try { contexts = JSON.parse(contextHeader); } catch (e) { }
+            }
+
+            // 6. First chunk arrived — update contexts
             setIsLoading(false);
+            setMessages(prev => prev.map(m =>
+                m.id === assistantMsgId ? { ...m, contexts } : m
+            ));
 
             // 7. Read stream chunks
             const reader = response.body.getReader();
@@ -120,7 +164,6 @@ export function useButlerChat() {
             setIsLoading(false);
             setError(err.message);
 
-            // 9. Update placeholder with error message
             setMessages(prev => prev.map(m =>
                 m.id === assistantMsgId
                     ? {
@@ -146,6 +189,7 @@ export function useButlerChat() {
         isLoading,
         error,
         suggestions,
+        ragStatus,
         toggleChat,
         sendMessage,
         clearChat

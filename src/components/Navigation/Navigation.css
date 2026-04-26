@@ -62,6 +62,14 @@
     transform: translate(-1px, -1px);
 }
 
+.nav-link.active {
+    background: var(--accent-yellow);
+    color: black;
+    border-color: var(--border-color);
+    box-shadow: 3px 3px 0px 0px #000000;
+    font-weight: 900;
+}
+
 .user-profile {
     display: flex;
     align-items: center;

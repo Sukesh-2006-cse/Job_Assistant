@@ -1,0 +1,154 @@
+.panel {
+    background: #fff;
+    border: 2px solid #000;
+    box-shadow: 4px 4px 0 #000;
+    padding: 20px;
+    margin-top: 24px;
+}
+
+/* Header */
+.header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    gap: 12px;
+}
+
+.headerLeft {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.titleRow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #111;
+    letter-spacing: -0.01em;
+}
+
+.timestamp {
+    font-size: 12px;
+    color: #888;
+}
+
+/* Source badges */
+.sourceBadge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 9px;
+    border: 2px solid #000;
+    border-radius: 0;
+    cursor: default;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.cached {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.generated {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* Refresh button */
+.refreshBtn {
+    font-size: 20px;
+    line-height: 1;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border: 2px solid #000;
+    box-shadow: 2px 2px 0 #000;
+    border-radius: 0;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, transform 0.12s;
+    flex-shrink: 0;
+}
+
+.refreshBtn:hover:not(:disabled) {
+    background: #000;
+    color: #fff;
+}
+
+.refreshBtn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.refreshBtn.spinning {
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Signal grid */
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+@media (max-width: 640px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Skeleton */
+.skeleton {
+    background: #f3f4f6;
+    border: 2px solid #e5e7eb;
+    height: 148px;
+    border-radius: 0;
+    animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.45;
+    }
+}
+
+/* Empty state */
+.empty {
+    padding: 32px 16px;
+    text-align: center;
+}
+
+.emptyTitle {
+    font-size: 14px;
+    font-weight: 600;
+    color: #555;
+    margin: 0 0 6px;
+}
+
+.emptySubtext {
+    font-size: 13px;
+    color: #888;
+    margin: 0;
+}

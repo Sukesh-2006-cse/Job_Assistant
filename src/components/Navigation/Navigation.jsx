@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Compass, ClipboardList, TrendingUp, User, LogOut, BarChart2 } from 'lucide-react';
 import './Navigation.css';
 
@@ -15,24 +15,24 @@ const Navigation = () => {
         <nav className="main-nav">
             <div className="logo" onClick={() => navigate('/dashboard')}>Apply-Flow</div>
             <div className="nav-links">
-                <Link to="/dashboard" className="nav-link">
+                <NavLink to="/dashboard" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                     <LayoutDashboard size={18} /> Butler
-                </Link>
-                <Link to="/discover" className="nav-link">
+                </NavLink>
+                <NavLink to="/discover" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                     <Compass size={18} /> Discover
-                </Link>
-                <Link to="/applications" className="nav-link">
+                </NavLink>
+                <NavLink to="/applications" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                     <ClipboardList size={18} /> My Applications
-                </Link>
-                <Link to="/career" className="nav-link">
+                </NavLink>
+                <NavLink to="/career" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                     <TrendingUp size={18} /> Career Butler
-                </Link>
-                <Link to="/analytics" className="nav-link">
+                </NavLink>
+                <NavLink to="/analytics" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                     <BarChart2 size={18} /> Analytics
-                </Link>
-                <Link to="/profile" className="nav-link">
+                </NavLink>
+                <NavLink to="/profile" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                     <User size={18} /> Profile
-                </Link>
+                </NavLink>
             </div>
             <div className="user-profile">
                 <span className="user-name">Welcome, {user?.name || 'Explorer'}</span>

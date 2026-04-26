@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './DiscoverPage.css';
 import Navigation from '../Navigation/Navigation';
 import CoverLetterModal from './CoverLetterModal';
-import { Target, MapPin, Briefcase, FileText, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
+import { Target, MapPin, Briefcase, FileText, ExternalLink, RefreshCw, AlertCircle, DollarSign } from 'lucide-react';
 
 const JobCard = ({ job, onGenerateCL }) => (
     <div className="job-card">
@@ -32,6 +32,12 @@ const JobCard = ({ job, onGenerateCL }) => (
                 <span><MapPin size={16} /> {job.location}</span>
                 <span><Briefcase size={16} /> {job.type}</span>
             </div>
+            {job.salary && (
+                <div className="salary-badge">
+                    <DollarSign size={14} />
+                    {job.salary}
+                </div>
+            )}
             <p className="job-description">{job.description}</p>
         </div>
         <div className="job-card-footer">
