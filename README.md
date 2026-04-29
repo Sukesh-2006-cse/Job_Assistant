@@ -35,36 +35,9 @@ graph TD
 
     B -->|Synced JSON Response| A
 ```
+---
 
-### 2. Real-Time Architecture — Agent Feed + Butler Chat
-Two parallel real-time pipelines run simultaneously: an **SSE push channel** for live agent logs and a **streaming HTTP endpoint** for the chat interface.
-
-```mermaid
-sequenceDiagram
-    participant FE as Frontend
-    participant SSE as /api/feed/activity (SSE)
-    participant CHAT as /api/chat/message (Streaming)
-    participant ORC as Orchestrator Agent
-    participant GROQ as Groq API (Llama 3.3)
-    participant DB as MongoDB
-
-    FE->>SSE: GET (EventSource, JWT in query)
-    SSE-->>FE: connected event
-
-    FE->>ORC: POST /api/butler/dashboard
-    ORC->>DB: Fetch jobs + profile
-    ORC-->>SSE: emit agent_activity events
-    SSE-->>FE: real-time event stream
-    ORC-->>FE: final JSON response
-
-    FE->>CHAT: POST (message + history)
-    CHAT->>DB: Fetch user context
-    CHAT->>GROQ: streamText(systemPrompt + history)
-    GROQ-->>CHAT: token stream
-    CHAT-->>FE: chunked text (word-by-word)
-```
-
-### 3. Job Recommendation Flow
+### 2. Job Recommendation Flow
 The Discover engine aggregates and scores jobs in real time across multiple APIs.
 
 ```mermaid
@@ -84,34 +57,6 @@ sequenceDiagram
     S->>S: Rank by Score
     S->>F: Display Premium Ranked List
 ```
-
-### 4. Authentication & Security Flow
-
-```mermaid
-graph LR
-    A[Google / Form Login] -->|Creds| B[Auth Route]
-    B -->|Check| C[(MongoDB)]
-    C -->|User Found| D[Generate JWT]
-    D -->|Token| E[LocalStorage]
-    E -->|Auth Header / Query param| F[Private Routes + SSE]
-    F -->|Verify| G[Protected API]
-```
-
-### 5. Analytics Data Pipeline
-All 5 datasets computed server-side in a single request — nothing heavy runs in the browser.
-
-```mermaid
-graph LR
-    A[GET /api/analytics/summary] --> B{MongoDB: All Jobs}
-    B --> C[Applications Over Time\n12-week grouping]
-    B --> D[Status Distribution\npercentages]
-    B --> E[Platform Performance\ninterview rate per source]
-    B --> F[Weekday Heatmap\napplied day of week]
-    B --> G[Key Metrics\ntotals + rates + averages]
-    C & D & E & F & G --> H[Single JSON Response]
-    H --> I[React: Recharts + CSS Grid]
-```
-
 ---
 
 ## 📱 Pages & Features
@@ -158,36 +103,6 @@ A dedicated read-only data visualisation page built with **Recharts**.
 - Which platform converts best
 - Response time warnings
 - Weekly application pace nudges
-
----
-
-## 🤖 🆕 Butler Chat Interface
-
-A floating AI chat assistant available on every authenticated page.
-
-```mermaid
-graph TD
-    A[Floating Bubble 🤵] -->|Click| B[Chat Window]
-    B --> C{useButlerChat hook}
-    C --> D[sendChatMessage — fetch streaming]
-    D --> E[POST /api/chat/message]
-    E --> F[Fetch user jobs + profile from DB]
-    F --> G[Build system prompt with full context]
-    G --> H[Groq streamText — Llama 3.3-70b]
-    H -->|chunked text stream| E
-    E -->|Transfer-Encoding: chunked| D
-    D -->|ReadableStream reader| C
-    C -->|setState per chunk| B
-```
-
-**Features:**
-- 🔄 **Real-time streaming** — words appear word-by-word as Groq responds
-- 🎯 **Context-aware** — Butler knows your actual companies, roles, skills, and priorities
-- 💡 **Smart suggestions** — chips auto-update with high-priority actions from `/api/butler/today`
-- 💬 **History** — last 10 messages sent with every request for conversational memory
-- 🗑️ **Clear chat** — one-click reset
-- 🔔 **Notification dot** — shows when there are unread messages and chat is closed
-- 📱 **Responsive** — adapts to mobile screen widths
 
 ---
 
